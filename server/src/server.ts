@@ -3,6 +3,7 @@ import http from "http";
 import cors from "cors";
 import WebSocket from "ws";
 import dotenv from "dotenv";
+import { exec } from "child_process";
 
 dotenv.config();
 
@@ -13,11 +14,39 @@ const server = http.createServer(app);
 
 const wss = new WebSocket.Server({server});
 
+function executeCommand (command: string) {
+    const lowerCommand = command.toLowerCase();
+
+    if(lowerCommand.startsWith('open ')){
+        const app = lowerCommand.slice(5);
+        exec(`start ${app}`, (error, stdout, stderr) => {
+            if(error) {
+                console.error("Error executing command", error.message);
+                return;
+            } 
+                console.log(`Opened ${app}`)
+        })
+    } else if(lowerCommand === 'shutdown') {
+        exec('shutdown /s /t 0', (error, stdout, stderr) => {
+            if(error) {
+                console.log(`Error in shutting down: ${error} `)
+                return;
+            }
+            console.log('Shutting down...')
+        })
+    } else {
+        console.log(`Unknown Command: ${command}`)
+    }
+}
+
 wss.on('connection', (ws) => {
     console.log("A new client connected");
 
-    ws.on('message', (message:string) => {
-        console.log("A new message received: ", message)
+    ws.on('message', (message: WebSocket.Data) => {
+        const messageString = message.toString();
+        console.log("A new message received: ", messageString)
+
+        executeCommand(messageString);
     })
 
     ws.on('close', () => {
