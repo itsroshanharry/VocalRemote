@@ -1,61 +1,86 @@
 import express from "express";
-import http from "http";
+import https from "https";
 import cors from "cors";
 import WebSocket from "ws";
-import dotenv from "dotenv";
 import { exec } from "child_process";
+import dotenv from "dotenv";
+import { generateSharedCertificate } from "../../shared/generateSharedCertificate";
 
 dotenv.config();
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: '*', // Be more restrictive in production
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
 
-const server = http.createServer(app);
+const { key, cert } = generateSharedCertificate();
 
-const wss = new WebSocket.Server({server});
+const server = https.createServer({ key, cert }, app);
 
-function executeCommand (command: string) {
-    const lowerCommand = command.toLowerCase();
+const wss = new WebSocket.Server({ server });
 
-    if(lowerCommand.startsWith('open ')){
-        const app = lowerCommand.slice(5);
-        exec(`start ${app}`, (error, stdout, stderr) => {
-            if(error) {
-                console.error("Error executing command", error.message);
-                return;
-            } 
-                console.log(`Opened ${app}`)
-        })
-    } else if(lowerCommand === 'shutdown') {
-        exec('shutdown /s /t 0', (error, stdout, stderr) => {
-            if(error) {
-                console.log(`Error in shutting down: ${error} `)
-                return;
-            }
-            console.log('Shutting down...')
-        })
-    } else {
-        console.log(`Unknown Command: ${command}`)
-    }
+function executeCommand(command: string) {
+  const lowerCommand = command.toLowerCase();
+  
+  if (lowerCommand.startsWith('open ')) {
+    const app = lowerCommand.slice(5);
+    exec(`start ${app}`, (error, stdout, stderr) => {
+      if (error) {
+        console.error("Error executing command", error.message);
+        return;
+      }
+      console.log(`Opened ${app}`);
+    });
+  } else if (lowerCommand === 'shutdown') {
+    exec('shutdown /s /t 0', (error, stdout, stderr) => {
+      if (error) {
+        console.log(`Error in shutting down: ${error} `);
+        return;
+      }
+      console.log('Shutting down...');
+    });
+  } else {
+    console.log(`Unknown Command: ${command}`);
+  }
 }
 
-wss.on('connection', (ws) => {
-    console.log("A new client connected");
+wss.on('connection', (ws: WebSocket) => {
+  console.log('New WebSocket connection');
 
-    ws.on('message', (message: WebSocket.Data) => {
-        const messageString = message.toString();
-        console.log("A new message received: ", messageString)
+  ws.on('message', (message: WebSocket.Data) => {
+    const messageString = message.toString();
+    console.log("A new message received: ", messageString);
+    executeCommand(messageString);
+  });
 
-        executeCommand(messageString);
-    })
+  ws.on('close', () => {
+    console.log('WebSocket disconnected');
+  });
 
-    ws.on('close', () => {
-        console.log("Client disconnected")
-    })
-})
+  ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
+  });
+});
+
+wss.on('error', (error) => {
+  console.error('WebSocket server error:', error);
+});
+
+server.on('error', (error) => {
+  console.error('HTTPS server error:', error);
+});
 
 const PORT = process.env.PORT || 3000;
+const IP = '0.0.0.0'; // This allows connections from any IP
 
 server.listen(PORT, () => {
-    console.log(`Server running on PORT: ${PORT}`)
-})
+  console.log(`Server running on https://localhost:${PORT}`);
+  console.log(`For mobile access, use: https://<your-computer-ip>:${PORT}`);
+});
+
+app.get('/', (req, res) => {
+  res.send('HTTPS server is working!');
+});

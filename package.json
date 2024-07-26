@@ -12,7 +12,11 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/selfsigned": "^2.0.4",
     "concurrently": "^8.2.2",
     "nodemon": "^3.1.4"
+  },
+  "dependencies": {
+    "selfsigned": "^2.4.1"
   }
 }

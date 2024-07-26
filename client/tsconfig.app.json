@@ -24,7 +24,8 @@
     "noFallthroughCasesInSwitch": true,
 
     /* Add this line */
+    "types": ["vite/client"],
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },
-  "include": ["src"]
+  "include": ["src", "vite-env.d.ts",  "src/vite-client.d.ts"]
 }

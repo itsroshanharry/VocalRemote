@@ -5,10 +5,13 @@
     "skipLibCheck": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "typeRoots": ["./node_modules/@types", "./src/types"],
     "allowSyntheticDefaultImports": true,
     "strict": true,
-    "noEmit": true
+    "noEmit": true,
+    "rootDir": ".."
   },
-  "include": ["vite.config.ts"]
+  "include": [
+    "vite.config.ts", 
+    "../shared/**/*"
+  ]
 }
