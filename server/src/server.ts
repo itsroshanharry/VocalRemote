@@ -5,6 +5,7 @@ import WebSocket from "ws";
 import { exec } from "child_process";
 import dotenv from "dotenv";
 import { generateSharedCertificate } from "../../shared/generateSharedCertificate";
+import { executeCommand } from "./commands/command";
 
 dotenv.config();
 
@@ -22,30 +23,6 @@ const server = https.createServer({ key, cert }, app);
 
 const wss = new WebSocket.Server({ server });
 
-function executeCommand(command: string) {
-  const lowerCommand = command.toLowerCase();
-  
-  if (lowerCommand.startsWith('open ')) {
-    const app = lowerCommand.slice(5);
-    exec(`start ${app}`, (error, stdout, stderr) => {
-      if (error) {
-        console.error("Error executing command", error.message);
-        return;
-      }
-      console.log(`Opened ${app}`);
-    });
-  } else if (lowerCommand === 'shutdown') {
-    exec('shutdown /s /t 0', (error, stdout, stderr) => {
-      if (error) {
-        console.log(`Error in shutting down: ${error} `);
-        return;
-      }
-      console.log('Shutting down...');
-    });
-  } else {
-    console.log(`Unknown Command: ${command}`);
-  }
-}
 
 wss.on('connection', (ws: WebSocket) => {
   console.log('New WebSocket connection');
