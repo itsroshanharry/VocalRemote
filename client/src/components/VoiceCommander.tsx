@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
 const VoiceCommander: React.FC = () => {
-  const [status, setStatus] = useState('Click "Start Listening" to begin');
+  const [status, setStatus] = useState('Choose an action');
   const [result, setResult] = useState('');
+  const [response, setResponse] = useState('');
   const [socket, setSocket] = useState<WebSocket | null>(null);
+
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     const wsUrl = `wss://${window.location.hostname}:3000`;
@@ -13,6 +16,22 @@ const VoiceCommander: React.FC = () => {
     newSocket.onopen = () => {
       console.log("WebSocket Connected");
       setSocket(newSocket);
+    };
+
+    newSocket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'answer') {
+        setResponse(`Answer: ${data.content}`);
+        if (data.audio) {
+          const audio = `data:audio/mp3;base64,${data.audio}`;
+          if (audioRef.current) {
+            audioRef.current.src = audio;
+            audioRef.current.play();
+          }
+        }
+      } else if (data.type === 'command') {
+        setResponse(data.content);
+      }
     };
 
     newSocket.onclose = (event) => {
@@ -30,33 +49,41 @@ const VoiceCommander: React.FC = () => {
     };
   }, []);
 
-  const startListening = () => {
+  const startListening = (type: 'command' | 'ai') => {
     if ('webkitSpeechRecognition' in window) {
       const recognition = new (window.webkitSpeechRecognition)() as SpeechRecognition;
       recognition.continuous = false;
       recognition.interimResults = false;
 
       recognition.onstart = () => {
-        setStatus('Listening...');
+        setStatus(`Listening for ${type}...`);
       };
 
       recognition.onresult = (event: SpeechRecognitionEvent) => {
-        const command = event.results[0][0].transcript;
-        setResult(`Command: ${command}`);
+        const input = event.results[0][0].transcript;
+        setResult(`You said: ${input}`);
+        
         if (socket && socket.readyState === WebSocket.OPEN) {
-          socket.send(command);
+          if (type === 'command') {
+            socket.send(JSON.stringify({ type: 'command', content: input }));
+            setStatus('Executing command...');
+          } else {
+            socket.send(JSON.stringify({ type: 'question', content: input }));
+            setStatus('Asking AI...');
+          }
         } else {
           console.error('WebSocket is not connected');
+          setStatus('Error: WebSocket not connected');
         }
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error("Speech Recognition Error", event.error);
-        setStatus(`error: ${event.error}`);
+        setStatus(`Error: ${event.error}`);
       };
 
       recognition.onend = () => {
-        setStatus('Click "Start Listening" to begin');
+        setStatus('Waiting for response...');
       };
 
       recognition.start();
@@ -68,9 +95,12 @@ const VoiceCommander: React.FC = () => {
   return (
     <div>
       <h1>Voice Command Remote</h1>
-      <button onClick={startListening}>Start Listening</button>
-      <div>{status}</div>
-      <div>{result}</div>
+      <button onClick={() => startListening('command')}>Listen for Command</button>
+      <button onClick={() => startListening('ai')}>Ask AI</button>
+      <p>{status}</p>
+      <p>{result}</p>
+      <p>{response}</p>
+      <audio ref={audioRef} />
     </div>
   );
 };
